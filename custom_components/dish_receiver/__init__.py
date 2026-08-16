@@ -18,6 +18,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import DishDataUpdateCoordinator
+from .frontend import async_register_frontend
 from .transport import DishTransport, TransportError, build_transport
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,8 @@ class DishRuntimeData:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a DISH receiver from a config entry."""
+    await async_register_frontend(hass)
+
     config = {**entry.data, **entry.options}
     transport_id = config.get(CONF_TRANSPORT, DEFAULT_TRANSPORT)
 

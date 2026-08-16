@@ -3,6 +3,7 @@
   "name": "DISH Receiver",
   "codeowners": [],
   "config_flow": true,
+  "dependencies": ["http", "frontend"],
   "documentation": "https://github.com/jamesarrowood/dish-receiver-hass",
   "integration_type": "device",
   "iot_class": "local_polling",

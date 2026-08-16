@@ -80,7 +80,25 @@ integration can't send them:
 - **Channel up/down** and **page up/down** — use **direct tuning** instead
   (`dish_receiver.tune_channel` or `play_media`), which works perfectly.
 - **Fast-forward** — only **Rewind** and **Jump** (skip-forward) exist.
-- **Volume/mute** — a TV-side function; route it through your TV/AVR entity.
+- **Volume up/down** — a TV-side function; route it through your TV/AVR entity.
+  (**Mute** is different — it *is* exposed and works over IP.)
+
+## Custom remote card
+
+A Lovelace card ships with the integration and registers itself automatically
+— no manual "add resource" step. It renders the physical remote's photo with
+clickable regions mapped to each button:
+
+```yaml
+type: custom:dish-remote-card
+entity: remote.living_room_1_remote
+```
+
+Buttons with no working IP command (Power, volume, channel step) are still
+shown, matching the physical remote, but tapping them shows why instead of
+silently failing. Click the ⚙ in the card's corner to see and drag the hit-box
+outlines if any button needs nudging — a "Copy map" button exports the result
+as JSON to paste back into the card config as a `buttons:` override.
 
 ## Services
 
