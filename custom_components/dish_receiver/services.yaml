@@ -1,0 +1,47 @@
+send_key:
+  name: Send key
+  description: Send a single raw remote key to the receiver.
+  target:
+    entity:
+      domain: remote
+      integration: dish_receiver
+  fields:
+    key:
+      name: Key
+      description: A key name, e.g. guide, info, channel_up, select, red.
+      required: true
+      example: guide
+      selector:
+        text:
+
+tune_channel:
+  name: Tune channel
+  description: Tune the receiver directly to a channel number.
+  target:
+    entity:
+      domain: media_player
+      integration: dish_receiver
+  fields:
+    channel:
+      name: Channel
+      description: Channel number, e.g. 140 or 140-01.
+      required: true
+      example: "140"
+      selector:
+        text:
+
+launch_app:
+  name: Launch app
+  description: Launch a streaming app on the receiver (e.g. Netflix, YouTube).
+  target:
+    entity:
+      domain: media_player
+      integration: dish_receiver
+  fields:
+    app:
+      name: App
+      description: App name as registered via DIAL (Netflix, YouTube).
+      required: true
+      example: Netflix
+      selector:
+        text:

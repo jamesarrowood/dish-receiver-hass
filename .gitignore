@@ -1,0 +1,25 @@
+# Paired credentials for a real receiver — never commit.
+tools/remote_creds.json
+
+# Vendor driver packages and decompiled/extracted source obtained during
+# protocol research. These are other companies' copyrighted software (RTI,
+# Control4, Crestron) — not ours to redistribute, even though they're only
+# used here for clean-room protocol analysis. Only our own written findings
+# (the .md files in tools/protocol-findings/) are tracked.
+tools/protocol-findings/control4/
+tools/protocol-findings/rti-extracted/
+tools/protocol-findings/rti-dish.rtidriver
+tools/protocol-findings/rti-strings.txt
+tools/protocol-findings/crestron-dish-hopper-v1.1.pdf
+
+# Python / test artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Local scratch state from tools/verify_control.py
+.verify_mac
+
+# Editor/OS cruft
+.DS_Store

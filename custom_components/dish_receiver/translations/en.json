@@ -1,0 +1,97 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "DISH Receiver",
+        "description": "Choose how Home Assistant should reach your receiver. If the receiver was found on the network, its address is pre-filled.",
+        "data": {
+          "transport": "Control method",
+          "host": "Receiver IP address",
+          "name": "Name"
+        }
+      },
+      "pair": {
+        "title": "Start pairing",
+        "description": "Home Assistant will ask the receiver at {host} to show a pairing PIN on the TV. If the serial couldn't be detected automatically, enter it (Menu → Settings → Diagnostics → System Status, starts with \"R\"). Leave blank to auto-detect, then submit.",
+        "data": {
+          "serial": "Receiver serial (optional, e.g. R0000000000-00)"
+        }
+      },
+      "pair_pin": {
+        "title": "Enter the PIN",
+        "description": "A PIN should now be on the TV connected to {host}. Enter it here to finish pairing. (If no PIN appeared, make sure pairing is allowed: Menu → Settings → Paired Devices.)",
+        "data": {
+          "pin": "PIN shown on the TV"
+        }
+      },
+      "cloud": {
+        "title": "DISH Anywhere account",
+        "description": "Sign in with your DISH Anywhere credentials.",
+        "data": {
+          "username": "Username or email",
+          "password": "Password"
+        }
+      },
+      "delegate": {
+        "title": "Delegate to a remote",
+        "description": "Pick an existing Home Assistant remote entity (IR blaster, Harmony, ESPHome) that will send the key presses.",
+        "data": {
+          "delegate_entity_id": "Remote entity"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the receiver at that address.",
+      "pairing_failed": "Pairing failed. Re-enable Pairing Request on the receiver and try the PIN again.",
+      "no_host": "No receiver address was provided."
+    },
+    "abort": {
+      "already_configured": "This receiver is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "DISH Receiver options",
+        "description": "Favorites let you tune by name (media_player source / select_source). One per line, as Name=Channel, e.g. ESPN=140.",
+        "data": {
+          "favorites_text": "Favorite channels",
+          "scan_interval": "State poll interval (seconds, 0 to disable)",
+          "delegate_entity_id": "Fallback remote entity (optional)"
+        }
+      }
+    }
+  },
+  "services": {
+    "send_key": {
+      "name": "Send key",
+      "description": "Send a single raw remote key to the receiver.",
+      "fields": {
+        "key": {
+          "name": "Key",
+          "description": "A key name, e.g. guide, info, channel_up, select, red."
+        }
+      }
+    },
+    "tune_channel": {
+      "name": "Tune channel",
+      "description": "Tune the receiver directly to a channel number.",
+      "fields": {
+        "channel": {
+          "name": "Channel",
+          "description": "Channel number, e.g. 140 or 140-01."
+        }
+      }
+    },
+    "launch_app": {
+      "name": "Launch app",
+      "description": "Launch a streaming app on the receiver (e.g. Netflix, YouTube).",
+      "fields": {
+        "app": {
+          "name": "App",
+          "description": "App name as registered via DIAL (Netflix, YouTube)."
+        }
+      }
+    }
+  }
+}
