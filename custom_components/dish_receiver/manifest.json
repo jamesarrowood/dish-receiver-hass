@@ -8,5 +8,11 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/jamesarrowood/dish-receiver-hass/issues",
   "requirements": [],
+  "ssdp": [
+    {
+      "deviceType": "urn:schemas-echostar-com:device:EchoStarDevice:1",
+      "manufacturer": "Echostar Technologies"
+    }
+  ],
   "version": "0.1.0"
 }

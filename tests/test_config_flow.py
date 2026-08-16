@@ -115,6 +115,75 @@ async def test_pairing_wrong_pin_shows_error(hass, monkeypatch):
     assert result["errors"]["base"] == "pairing_failed"
 
 
+async def test_ssdp_discovery_finds_and_pairs(hass, monkeypatch):
+    """A real EchoStar SSDP announcement -> confirm card -> pairing flow."""
+    from homeassistant.components import ssdp
+
+    fake = _FakeLocal()
+    monkeypatch.setattr(
+        "custom_components.dish_receiver.config_flow.build_transport",
+        lambda hass, tid, cfg: fake,
+    )
+
+    discovery_info = ssdp.SsdpServiceInfo(
+        ssdp_usn="uuid:test-udn::urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_st="urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_location="http://192.168.1.50:49316/device.xml",
+        upnp={
+            ssdp.ATTR_UPNP_SERIAL: "R0000000000-00",
+            ssdp.ATTR_UPNP_MODEL_NAME: "XiP813",
+            ssdp.ATTR_UPNP_FRIENDLY_NAME: "Living Room",
+            ssdp.ATTR_UPNP_UDN: "uuid:test-udn",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_SSDP}, data=discovery_info
+    )
+    assert result["step_id"] == "ssdp_confirm"
+
+    # Confirming the discovery card jumps straight into the existing pairing flow.
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "pair_pin"
+    assert fake.started is True
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"pin": "1234"}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == "192.168.1.50"
+    assert result["data"]["name"] == "Living Room"
+    assert result["result"].unique_id == "R0000000000-00"
+
+
+async def test_ssdp_discovery_dedupes_already_configured(hass, monkeypatch):
+    """A second announcement for an already-set-up receiver aborts, not re-pairs."""
+    from homeassistant.components import ssdp
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="R0000000000-00",
+        data={CONF_HOST: "192.168.1.50", CONF_TRANSPORT: TRANSPORT_LOCAL_HTTP},
+    )
+    entry.add_to_hass(hass)
+
+    discovery_info = ssdp.SsdpServiceInfo(
+        ssdp_usn="uuid:test-udn::urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_st="urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_location="http://192.168.1.51:49316/device.xml",
+        upnp={ssdp.ATTR_UPNP_SERIAL: "R0000000000-00"},
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_SSDP}, data=discovery_info
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    # The host was updated to the newly-announced address.
+    assert entry.data[CONF_HOST] == "192.168.1.51"
+
+
 async def test_delegate_flow_skips_pairing(hass):
     """Delegate transport needs no receiver handshake."""
     result = await hass.config_entries.flow.async_init(

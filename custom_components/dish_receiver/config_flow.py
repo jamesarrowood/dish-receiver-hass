@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 import voluptuous as vol
+from homeassistant.components import ssdp
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -141,6 +143,63 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(
             step_id="user", data_schema=schema, errors=errors
+        )
+
+    async def async_step_ssdp(
+        self, discovery_info: ssdp.SsdpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle a receiver found by Home Assistant's passive SSDP scanner.
+
+        manifest.json's `ssdp` matcher (deviceType +
+        urn:schemas-echostar-com:device:EchoStarDevice:1, confirmed from a real
+        Wally's UPnP device.xml) is what routes discovery here — HA watches for
+        SSDP announcements network-wide and calls this step on a match, with no
+        polling or extra network access needed from us.
+        """
+        host = urlparse(discovery_info.ssdp_location or "").hostname
+        if not host:
+            return self.async_abort(reason="cannot_connect")
+
+        upnp = discovery_info.upnp
+        serial = upnp.get(ssdp.ATTR_UPNP_SERIAL)
+        model = upnp.get(ssdp.ATTR_UPNP_MODEL_NAME) or upnp.get(
+            ssdp.ATTR_UPNP_MODEL_DESCRIPTION
+        )
+        name = upnp.get(ssdp.ATTR_UPNP_FRIENDLY_NAME)
+        udn = upnp.get(ssdp.ATTR_UPNP_UDN)
+
+        unique = serial or udn or host
+        await self.async_set_unique_id(unique)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+
+        self._data[CONF_HOST] = host
+        self._data[CONF_TRANSPORT] = TRANSPORT_LOCAL_HTTP
+        self._data.setdefault(CONF_CONTROLLER_MAC, _generate_controller_mac())
+        if serial:
+            self._data[CONF_SERIAL] = serial
+        if model:
+            self._data[CONF_MODEL] = model
+        if name:
+            self._data[CONF_NAME] = name
+        if udn:
+            self._data[CONF_MAC] = udn
+
+        self.context["title_placeholders"] = {"name": name or "DISH Receiver"}
+        return await self.async_step_ssdp_confirm()
+
+    async def async_step_ssdp_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the discovered receiver; submitting starts pairing."""
+        if user_input is not None:
+            return await self.async_step_pair()
+
+        return self.async_show_form(
+            step_id="ssdp_confirm",
+            description_placeholders={
+                "name": self._data.get(CONF_NAME) or "DISH Receiver",
+                "host": self._data.get(CONF_HOST, ""),
+            },
         )
 
     async def async_step_pair(

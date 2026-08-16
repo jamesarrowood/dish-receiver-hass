@@ -38,6 +38,10 @@
         "data": {
           "delegate_entity_id": "Remote entity"
         }
+      },
+      "ssdp_confirm": {
+        "title": "DISH Receiver found",
+        "description": "Home Assistant found {name} at {host} on the network. Submit to start pairing."
       }
     },
     "error": {
@@ -46,7 +50,8 @@
       "no_host": "No receiver address was provided."
     },
     "abort": {
-      "already_configured": "This receiver is already set up."
+      "already_configured": "This receiver is already set up.",
+      "cannot_connect": "Could not determine the discovered receiver's address."
     }
   },
   "options": {

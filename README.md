@@ -32,10 +32,15 @@ transports exist as stubs/fallbacks and are not needed for a Wally.
 1. HACS → Integrations → ⋮ → Custom repositories → add this repo as an
    *Integration*.
 2. Install **DISH Receiver**, restart Home Assistant.
-3. Settings → Devices & Services → **Add Integration** → **DISH Receiver**.
-4. Choose **Local**. The receiver's IP and serial are pre-filled from discovery
-   (or type the serial from Menu → Settings → Diagnostics → System Status).
-5. Submit — a **PIN appears on the TV**. Enter it. Done.
+3. Home Assistant auto-discovers the receiver on the network (it matches the
+   real SSDP announcement a Wally/Hopper broadcasts) — look for a **"DISH
+   Receiver found"** card under Settings → Devices & Services, or add it
+   manually via **Add Integration** → **DISH Receiver** if you'd rather.
+4. Submit — a **PIN appears on the TV**. Enter it. Done.
+
+The integration's icon in the UI/HACS depends on a logo submission to Home
+Assistant's separate [`brands`](https://github.com/home-assistant/brands) repo
+— see [branding/](branding/) for the prepared assets and submission status.
 
 ## What you get
 
