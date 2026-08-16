@@ -23,9 +23,11 @@
  * `buttons:` in the card config, or back into DEFAULT_BUTTONS below.
  *
  * Coordinates are percentages of the image's rendered width/height, so the
- * map holds at any card width. The DEFAULT_BUTTONS values are a first-pass
- * layout estimate for the pictured remote — expect to nudge a few boxes with
- * the calibration tool against the real photo before it's pixel-perfect.
+ * map holds at any card width. DEFAULT_BUTTONS was measured against the
+ * bundled photo with a labeled pixel grid overlaid on the source, then
+ * checked by rendering the resulting boxes back onto the photo and visually
+ * confirming every one lands on its real button — not guessed. The
+ * calibration tool remains for anyone who wants to fine-tune further.
  */
 
 // key: a RemoteKey value from custom_components/dish_receiver/keys.py, or
@@ -35,45 +37,52 @@
 // x/y: center of the hit-box, percent of image width/height.
 // w/h: hit-box size, percent of image width/height.
 const DEFAULT_BUTTONS = [
-  { key: null, label: "Power", x: 16, y: 4, w: 14, h: 5, note: "Not available over IP (IR-only)." },
-  { key: "home", label: "Home", x: 50, y: 5, w: 16, h: 5 },
-  { key: "guide", label: "Guide", x: 84, y: 5, w: 18, h: 5 },
+  { key: null, label: "Power", x: 50, y: 7.4, w: 18, h: 10.3, note: "Not available over IP (IR-only)." },
+  { key: null, label: "Mode", x: 65.8, y: 3.6, w: 13.5, h: 5.4, note: "Device-target switch (SAT/TV/AUX); not sent to the receiver." },
+  { key: null, label: "?", x: 81.2, y: 6.3, w: 12.5, h: 5.7, note: "Function unclear from the photo." },
 
-  { key: "dvr", label: "DVR", x: 16, y: 12, w: 18, h: 4 },
-  { key: "options", label: "Options", x: 22, y: 18, w: 20, h: 4 },
-  { key: "microphone", label: "Mic", x: 80, y: 16, w: 20, h: 8 },
+  { key: "dvr", label: "DVR", x: 28, y: 16.1, w: 34, h: 9.4 },
+  { key: "home", label: "Home", x: 51, y: 16.1, w: 20, h: 11.1 },
+  { key: "guide", label: "Guide", x: 80, y: 16.1, w: 36, h: 9.4 },
 
-  { key: "up", label: "Up", x: 50, y: 27, w: 16, h: 6 },
-  { key: "left", label: "Left", x: 30, y: 35, w: 14, h: 8 },
-  { key: "select", label: "Select", x: 50, y: 35, w: 18, h: 10 },
-  { key: "right", label: "Right", x: 70, y: 35, w: 14, h: 8 },
-  { key: "down", label: "Down", x: 50, y: 44, w: 16, h: 6 },
+  { key: "options", label: "Options", x: 22.5, y: 20, w: 35, h: 8.6 },
+  { key: "microphone", label: "Mic", x: 80, y: 20, w: 30, h: 8.6 },
+  { key: "up", label: "Up", x: 50, y: 19.3, w: 15, h: 4.3 },
 
-  { key: "back", label: "Back", x: 22, y: 51, w: 20, h: 4 },
-  { key: "info", label: "Info", x: 78, y: 51, w: 20, h: 4 },
+  { key: "left", label: "Left", x: 23.2, y: 27.1, w: 13.5, h: 6.3 },
+  { key: "select", label: "Select", x: 55.5, y: 26.6, w: 23, h: 8.6 },
+  { key: "right", label: "Right", x: 76.8, y: 27.1, w: 13.5, h: 6.3 },
+  { key: "down", label: "Down", x: 50, y: 34.9, w: 11, h: 4.6 },
 
-  { key: "live_tv", label: "Live TV", x: 22, y: 58, w: 20, h: 5 },
-  { key: "help", label: "Help", x: 78, y: 58, w: 20, h: 5 },
+  { key: "back", label: "Back", x: 30, y: 37.1, w: 30, h: 4 },
+  { key: "info", label: "Info", x: 84, y: 37.1, w: 28, h: 4 },
+  { key: "live_tv", label: "Live TV", x: 30, y: 41.1, w: 30, h: 4 },
+  { key: "help", label: "Help", x: 84, y: 41.1, w: 28, h: 4 },
 
-  { key: "rewind", label: "Rewind", x: 30, y: 65, w: 18, h: 5 },
-  { key: "play", label: "Play/Pause", x: 55, y: 65, w: 22, h: 5 },
+  { key: "rewind", label: "Rewind", x: 24, y: 44.6, w: 30, h: 5.1 },
+  { key: "play", label: "Play/Pause", x: 50, y: 44.6, w: 28, h: 5.1 },
+  { key: "jump", label: "Jump", x: 77.5, y: 44.6, w: 30, h: 5.1 },
 
-  { key: null, label: "Vol +", x: 12, y: 71, w: 14, h: 4, note: "Volume is TV-side; route it through your TV/AVR entity." },
-  { key: null, label: "Vol −", x: 12, y: 78, w: 14, h: 4, note: "Volume is TV-side; route it through your TV/AVR entity." },
-  { key: "recall", label: "Recall", x: 50, y: 74, w: 18, h: 5 },
-  { key: null, label: "Ch +", x: 88, y: 71, w: 14, h: 4, note: "Not available over IP on a Wally — use tune-by-number instead." },
-  { key: null, label: "Ch −", x: 88, y: 78, w: 14, h: 4, note: "Not available over IP on a Wally — use tune-by-number instead." },
-  { key: "mute", label: "Mute", x: 50, y: 82, w: 16, h: 4 },
+  { key: null, label: "Vol +", x: 29.8, y: 50.9, w: 22.5, h: 4.6, note: "Volume is TV-side; route it through your TV/AVR entity." },
+  { key: null, label: "Vol −", x: 29.8, y: 58, w: 22.5, h: 4.6, note: "Volume is TV-side; route it through your TV/AVR entity." },
+  { key: "recall", label: "Recall", x: 50, y: 50.9, w: 24, h: 4.6 },
+  { key: null, label: "Ch +", x: 64, y: 50, w: 20, h: 4.6, note: "Not available over IP on a Wally — use tune-by-number instead." },
+  { key: null, label: "Ch −", x: 64, y: 57.1, w: 20, h: 4.6, note: "Not available over IP on a Wally — use tune-by-number instead." },
+  { key: "mute", label: "Mute", x: 50, y: 57.1, w: 24, h: 5.7 },
 
-  { key: "1", label: "1", x: 30, y: 88, w: 14, h: 5 },
-  { key: "2", label: "2", x: 50, y: 88, w: 14, h: 5 },
-  { key: "3", label: "3", x: 70, y: 88, w: 14, h: 5 },
-  { key: "4", label: "4", x: 30, y: 93, w: 14, h: 5 },
-  { key: "5", label: "5", x: 50, y: 93, w: 14, h: 5 },
-  { key: "6", label: "6", x: 70, y: 93, w: 14, h: 5 },
-  { key: "7", label: "7", x: 30, y: 98, w: 14, h: 5 },
-  { key: "8", label: "8", x: 50, y: 98, w: 14, h: 5 },
-  { key: "9", label: "9", x: 70, y: 98, w: 14, h: 5 },
+  { key: "1", label: "1", x: 30.2, y: 63.7, w: 22.5, h: 5.7 },
+  { key: "2", label: "2", x: 50.2, y: 63.7, w: 22.5, h: 5.7 },
+  { key: "3", label: "3", x: 70.2, y: 63.7, w: 22.5, h: 5.7 },
+  { key: "4", label: "4", x: 30.2, y: 70.3, w: 22.5, h: 5.7 },
+  { key: "5", label: "5", x: 50.2, y: 70.3, w: 22.5, h: 5.7 },
+  { key: "6", label: "6", x: 70.2, y: 70.3, w: 22.5, h: 5.7 },
+  { key: "7", label: "7", x: 30.2, y: 76.6, w: 22.5, h: 5.7 },
+  { key: "8", label: "8", x: 50.2, y: 76.6, w: 22.5, h: 5.7 },
+  { key: "9", label: "9", x: 70.2, y: 76.6, w: 22.5, h: 5.7 },
+
+  { key: null, label: "◆", x: 30.2, y: 82.6, w: 22.5, h: 5.1, note: "Function/DASH not confirmed working over IP on the Wally." },
+  { key: "0", label: "0", x: 50.2, y: 82.6, w: 22.5, h: 5.1 },
+  { key: null, label: "◆◆", x: 70.2, y: 82.6, w: 22.5, h: 5.1, note: "Function unclear from the photo." },
 ];
 
 const DEFAULT_IMAGE = "/dish_receiver_static/dish-remote.png";
