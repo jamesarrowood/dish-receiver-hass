@@ -100,6 +100,11 @@ silently failing. Click the ⚙ in the card's corner to see and drag the hit-box
 outlines if any button needs nudging — a "Copy map" button exports the result
 as JSON to paste back into the card config as a `buttons:` override.
 
+Prefer a grid-style remote instead of a photo?
+[example-universal-remote-card.yaml](custom_components/dish_receiver/www/example-universal-remote-card.yaml)
+is a ready-to-paste config for the separate [Universal Remote Card](https://github.com/Nerwyn/universal-remote-card)
+(install that card via HACS first) covering every confirmed-working key.
+
 ## Services
 
 - `dish_receiver.tune_channel` — `{ channel: "140" }`

@@ -1,0 +1,560 @@
+# Universal Remote Card (Nerwyn/universal-remote-card, a separate HACS frontend
+# card — not the dish-remote-card bundled with this integration) configured for
+# every key confirmed working over IP on a Wally.
+# See tools/protocol-findings/WALLY_KEYS.md for the source of truth.
+#
+# Every button calls remote.send_command explicitly (action: perform-action)
+# rather than relying on the card's built-in "Generic Remote" name-guessing,
+# so it's guaranteed to send exactly the command this integration expects.
+#
+# Deliberately omitted: Power, Volume +/-, Channel +/-, Page +/-, Fast-Forward,
+# Dash — none are exposed over IP on a Wally (see WALLY_KEYS.md). Including
+# them would just add dead buttons.
+#
+# Replace remote.dish_receiver_remote below with your actual entity id if it
+# differs (Settings -> Devices & Services -> your receiver -> Entities).
+
+type: custom:universal-remote-card
+remote_id: remote.dish_receiver_remote
+platform: Generic Remote
+title: DISH Receiver
+rows:
+- - dvr
+  - home
+  - guide
+- - options
+  - search
+  - input
+- - null
+  - up
+  - null
+- - left
+  - select
+  - right
+- - null
+  - down
+  - null
+- - back
+  - cancel
+  - info
+- - live_tv
+  - menu
+  - format
+- - rewind
+  - play
+  - pause
+  - stop
+  - jump
+- - record
+  - recall
+  - mute
+  - mode
+- - '1'
+  - '2'
+  - '3'
+- - '4'
+  - '5'
+  - '6'
+- - '7'
+  - '8'
+  - '9'
+- - null
+  - '0'
+  - null
+- - red
+  - green
+  - yellow
+  - blue
+- - applications
+  - help
+  - microphone
+- - keypad
+  - backspace
+  - delete
+custom_actions:
+- type: button
+  name: dvr
+  label: DVR
+  icon: mdi:folder-play
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: dvr
+- type: button
+  name: home
+  label: Home
+  icon: mdi:home
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: home
+- type: button
+  name: guide
+  label: Guide
+  icon: mdi:view-grid
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: guide
+- type: button
+  name: options
+  label: Options
+  icon: mdi:tune
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: options
+- type: button
+  name: search
+  label: Search
+  icon: mdi:magnify
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: search
+- type: button
+  name: input
+  label: Input
+  icon: mdi:import
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: input
+- type: button
+  name: up
+  icon: mdi:chevron-up
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: up
+- type: button
+  name: down
+  icon: mdi:chevron-down
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: down
+- type: button
+  name: left
+  icon: mdi:chevron-left
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: left
+- type: button
+  name: right
+  icon: mdi:chevron-right
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: right
+- type: button
+  name: select
+  label: Select
+  icon: mdi:checkbox-blank-circle
+  styles: ":host {\n  --icon-color: red;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: select
+- type: button
+  name: back
+  label: Back
+  icon: mdi:arrow-left
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: back
+- type: button
+  name: cancel
+  label: Cancel
+  icon: mdi:close
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: exit
+- type: button
+  name: info
+  label: Info
+  icon: mdi:information-outline
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: info
+- type: button
+  name: live_tv
+  label: Live TV
+  icon: mdi:television
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: live_tv
+- type: button
+  name: menu
+  label: Menu
+  icon: mdi:menu
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: menu
+- type: button
+  name: format
+  label: Format
+  icon: mdi:aspect-ratio
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: format
+- type: button
+  name: rewind
+  icon: mdi:rewind
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: rewind
+- type: button
+  name: play
+  icon: mdi:play
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: play
+- type: button
+  name: pause
+  icon: mdi:pause
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: pause
+- type: button
+  name: stop
+  icon: mdi:stop
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: stop
+- type: button
+  name: jump
+  label: Jump
+  icon: mdi:skip-forward
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: jump
+- type: button
+  name: record
+  icon: mdi:record
+  styles: ":host {\n  --icon-color: red;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: record
+- type: button
+  name: recall
+  label: Recall
+  icon: mdi:history
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: recall
+- type: button
+  name: mute
+  icon: mdi:volume-mute
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: mute
+- type: button
+  name: mode
+  label: Mode
+  icon: mdi:swap-horizontal
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: mode
+- type: button
+  name: '1'
+  label: '1'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '1'
+- type: button
+  name: '2'
+  label: '2'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '2'
+- type: button
+  name: '3'
+  label: '3'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '3'
+- type: button
+  name: '4'
+  label: '4'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '4'
+- type: button
+  name: '5'
+  label: '5'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '5'
+- type: button
+  name: '6'
+  label: '6'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '6'
+- type: button
+  name: '7'
+  label: '7'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '7'
+- type: button
+  name: '8'
+  label: '8'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '8'
+- type: button
+  name: '9'
+  label: '9'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '9'
+- type: button
+  name: '0'
+  label: '0'
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: '0'
+- type: button
+  name: red
+  icon: mdi:circle
+  styles: ":host {\n  --icon-color: #d32f2f;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: red
+- type: button
+  name: green
+  icon: mdi:circle
+  styles: ":host {\n  --icon-color: #388e3c;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: green
+- type: button
+  name: yellow
+  icon: mdi:circle
+  styles: ":host {\n  --icon-color: #fbc02d;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: yellow
+- type: button
+  name: blue
+  icon: mdi:circle
+  styles: ":host {\n  --icon-color: #1976d2;\n}\n"
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: blue
+- type: button
+  name: applications
+  label: Apps
+  icon: mdi:apps
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: applications
+- type: button
+  name: help
+  label: Help
+  icon: mdi:help-circle
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: help
+- type: button
+  name: microphone
+  label: Voice
+  icon: mdi:microphone
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: microphone
+- type: button
+  name: keypad
+  label: Keypad
+  icon: mdi:dialpad
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: keypad
+- type: button
+  name: backspace
+  icon: mdi:backspace
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: backspace
+- type: button
+  name: delete
+  icon: mdi:delete
+  tap_action:
+    action: perform-action
+    perform_action: remote.send_command
+    target:
+      entity_id: remote.dish_receiver_remote
+    data:
+      command: delete
