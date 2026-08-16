@@ -115,26 +115,34 @@ async def test_pairing_wrong_pin_shows_error(hass, monkeypatch):
     assert result["errors"]["base"] == "pairing_failed"
 
 
+def _ssdp_info(**upnp):
+    """Build an SsdpServiceInfo regardless of which HA version we're on."""
+    try:
+        from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
+    except ImportError:
+        from homeassistant.components.ssdp import SsdpServiceInfo
+    return SsdpServiceInfo(
+        ssdp_usn="uuid:test-udn::urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_st="urn:schemas-echostar-com:device:EchoStarDevice:1",
+        ssdp_location=upnp.pop("_location", "http://192.168.1.50:49316/device.xml"),
+        upnp=upnp,
+    )
+
+
 async def test_ssdp_discovery_finds_and_pairs(hass, monkeypatch):
     """A real EchoStar SSDP announcement -> confirm card -> pairing flow."""
-    from homeassistant.components import ssdp
-
     fake = _FakeLocal()
     monkeypatch.setattr(
         "custom_components.dish_receiver.config_flow.build_transport",
         lambda hass, tid, cfg: fake,
     )
 
-    discovery_info = ssdp.SsdpServiceInfo(
-        ssdp_usn="uuid:test-udn::urn:schemas-echostar-com:device:EchoStarDevice:1",
-        ssdp_st="urn:schemas-echostar-com:device:EchoStarDevice:1",
-        ssdp_location="http://192.168.1.50:49316/device.xml",
-        upnp={
-            ssdp.ATTR_UPNP_SERIAL: "R0000000000-00",
-            ssdp.ATTR_UPNP_MODEL_NAME: "XiP813",
-            ssdp.ATTR_UPNP_FRIENDLY_NAME: "Living Room",
-            ssdp.ATTR_UPNP_UDN: "uuid:test-udn",
-        },
+    # Uses the spec UPnP field names — the same keys the flow reads.
+    discovery_info = _ssdp_info(
+        serialNumber="R0000000000-00",
+        modelName="HEVC Joey",
+        friendlyName="Bedroom 1",
+        UDN="uuid:test-udn",
     )
 
     result = await hass.config_entries.flow.async_init(
@@ -152,14 +160,13 @@ async def test_ssdp_discovery_finds_and_pairs(hass, monkeypatch):
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_HOST] == "192.168.1.50"
-    assert result["data"]["name"] == "Living Room"
+    # Name carries the model so multiple Joeys are distinguishable.
+    assert result["data"]["name"] == "Bedroom 1 (HEVC Joey)"
     assert result["result"].unique_id == "R0000000000-00"
 
 
 async def test_ssdp_discovery_dedupes_already_configured(hass, monkeypatch):
     """A second announcement for an already-set-up receiver aborts, not re-pairs."""
-    from homeassistant.components import ssdp
-
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
@@ -169,11 +176,9 @@ async def test_ssdp_discovery_dedupes_already_configured(hass, monkeypatch):
     )
     entry.add_to_hass(hass)
 
-    discovery_info = ssdp.SsdpServiceInfo(
-        ssdp_usn="uuid:test-udn::urn:schemas-echostar-com:device:EchoStarDevice:1",
-        ssdp_st="urn:schemas-echostar-com:device:EchoStarDevice:1",
-        ssdp_location="http://192.168.1.51:49316/device.xml",
-        upnp={ssdp.ATTR_UPNP_SERIAL: "R0000000000-00"},
+    discovery_info = _ssdp_info(
+        serialNumber="R0000000000-00",
+        _location="http://192.168.1.51:49316/device.xml",
     )
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_SSDP}, data=discovery_info

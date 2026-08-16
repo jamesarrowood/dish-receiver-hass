@@ -11,8 +11,7 @@
   "requirements": [],
   "ssdp": [
     {
-      "deviceType": "urn:schemas-echostar-com:device:EchoStarDevice:1",
-      "manufacturer": "Echostar Technologies"
+      "deviceType": "urn:schemas-echostar-com:device:EchoStarDevice:1"
     }
   ],
   "version": "0.1.0"

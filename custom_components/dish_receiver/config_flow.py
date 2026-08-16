@@ -8,7 +8,13 @@ from typing import Any
 from urllib.parse import urlparse
 
 import voluptuous as vol
-from homeassistant.components import ssdp
+
+try:
+    # HA 2025.2+: the SSDP discovery-info type lives here.
+    from homeassistant.helpers.service_info.ssdp import SsdpServiceInfo
+except ImportError:  # pragma: no cover - older cores
+    from homeassistant.components.ssdp import SsdpServiceInfo
+
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -146,7 +152,7 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_ssdp(
-        self, discovery_info: ssdp.SsdpServiceInfo
+        self, discovery_info: SsdpServiceInfo
     ) -> ConfigFlowResult:
         """Handle a receiver found by Home Assistant's passive SSDP scanner.
 
@@ -160,13 +166,14 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
         if not host:
             return self.async_abort(reason="cannot_connect")
 
+        # Read the UPnP device-description fields by their spec-defined names
+        # (stable across HA versions) rather than ssdp.ATTR_* constants, which
+        # have moved between the ssdp component and helpers over releases.
         upnp = discovery_info.upnp
-        serial = upnp.get(ssdp.ATTR_UPNP_SERIAL)
-        model = upnp.get(ssdp.ATTR_UPNP_MODEL_NAME) or upnp.get(
-            ssdp.ATTR_UPNP_MODEL_DESCRIPTION
-        )
-        name = upnp.get(ssdp.ATTR_UPNP_FRIENDLY_NAME)
-        udn = upnp.get(ssdp.ATTR_UPNP_UDN)
+        serial = upnp.get("serialNumber")
+        model = upnp.get("modelName") or upnp.get("modelDescription")
+        name = upnp.get("friendlyName")
+        udn = upnp.get("UDN")
 
         unique = serial or udn or host
         await self.async_set_unique_id(unique)
@@ -179,12 +186,17 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data[CONF_SERIAL] = serial
         if model:
             self._data[CONF_MODEL] = model
-        if name:
-            self._data[CONF_NAME] = name
         if udn:
             self._data[CONF_MAC] = udn
 
-        self.context["title_placeholders"] = {"name": name or "DISH Receiver"}
+        # Room name plus model, so multiple Joeys ("Bedroom 1", "Bedroom 2",
+        # each an HEVC Joey) stay distinct in the device list.
+        display = name or "DISH Receiver"
+        if model and model not in display:
+            display = f"{display} ({model})"
+        self._data[CONF_NAME] = display
+
+        self.context["title_placeholders"] = {"name": display}
         return await self.async_step_ssdp_confirm()
 
     async def async_step_ssdp_confirm(

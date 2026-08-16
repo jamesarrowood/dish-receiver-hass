@@ -1,8 +1,13 @@
 # DISH Receiver for Home Assistant
 
-Control a DISH **Wally** (or Hopper) satellite receiver from Home Assistant over
-your LAN — a `media_player` entity plus a full `remote` entity — installable via
-HACS. No IR blaster, no cloud, no hub.
+Control a DISH **Wally**, **Hopper**, or **Joey** receiver from Home Assistant
+over your LAN — a `media_player` entity plus a full `remote` entity — installable
+via HACS. No IR blaster, no cloud, no hub.
+
+**Multiple boxes?** Wally, Hopper, and every Joey each run the same control
+service on their own IP, so each is added as its own device — pair them one at a
+time. They all auto-discover (see below); the discovery card shows the room name
+plus model (e.g. *Bedroom 1 (HEVC Joey)*) so several Joeys stay distinct.
 
 > **Status: working and hardware-verified.** The local control protocol was
 > reverse-engineered from the RTI driver source and confirmed live against a
@@ -31,12 +36,18 @@ transports exist as stubs/fallbacks and are not needed for a Wally.
 
 1. HACS → Integrations → ⋮ → Custom repositories → add this repo as an
    *Integration*.
-2. Install **DISH Receiver**, restart Home Assistant.
-3. Home Assistant auto-discovers the receiver on the network (it matches the
-   real SSDP announcement a Wally/Hopper broadcasts) — look for a **"DISH
-   Receiver found"** card under Settings → Devices & Services, or add it
-   manually via **Add Integration** → **DISH Receiver** if you'd rather.
-4. Submit — a **PIN appears on the TV**. Enter it. Done.
+2. Install **DISH Receiver**, then **fully restart Home Assistant** — not just
+   "reload"/"redownload". SSDP discovery matchers are registered only at Home
+   Assistant startup, so a restart is required before auto-discovery can fire.
+3. Each receiver on the network appears as its own **"DISH Receiver found"** card
+   under Settings → Devices & Services (a Hopper + 4 Joeys shows 5 cards). Or add
+   any of them manually via **Add Integration** → **DISH Receiver** by IP.
+4. Submit — a **PIN appears on that box's TV**. Enter it. Done. Repeat per box.
+
+*Discovery not showing up?* Confirm you did a full HA restart (step 2), that the
+box is on the same subnet as HA (SSDP is link-local — it won't cross VLANs
+without an mDNS/SSDP reflector), and that HA's built-in **SSDP** integration is
+enabled (it is by default via `default_config`).
 
 The DISH logo ships inline with the integration
 ([custom_components/dish_receiver/brand/](custom_components/dish_receiver/brand/))
