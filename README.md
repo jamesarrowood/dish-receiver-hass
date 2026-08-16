@@ -38,9 +38,12 @@ transports exist as stubs/fallbacks and are not needed for a Wally.
    manually via **Add Integration** → **DISH Receiver** if you'd rather.
 4. Submit — a **PIN appears on the TV**. Enter it. Done.
 
-The integration's icon in the UI/HACS depends on a logo submission to Home
-Assistant's separate [`brands`](https://github.com/home-assistant/brands) repo
-— see [branding/](branding/) for the prepared assets and submission status.
+The DISH logo ships inline with the integration
+([custom_components/dish_receiver/brand/](custom_components/dish_receiver/brand/))
+via Home Assistant's Brands Proxy API (HA 2026.3+) — no external submission
+needed, it just shows up. On older HA cores the icon slot is simply blank; the
+integration still works. Logo source: DISH's current wordmark (2019–), from
+[Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Dish_Network_2019.svg).
 
 ## What you get
 
