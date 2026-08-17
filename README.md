@@ -79,15 +79,18 @@ selecting a favorite tunes it.
 ```yaml
 service: remote.send_command
 target: { entity_id: remote.living_room_1_remote }
-data: { command: [Guide, Down, Down, Enter], delay_secs: 0.4 }
+data: { command: [guide, down, down, select], delay_secs: 0.4 }
 ```
 
-Confirmed working keys (case-sensitive): `Home Guide Info Menu Up Down Left Right
-Enter Cancel Back Options Search Input Format Play Pause Stop Record Rewind Jump
-Recall DVR TV Red Green Yellow Blue Applications Help Microphone Keypad Backspace
-Delete`, and digits `0`–`9`. You can also use the integration's friendly names
-(`channel_up`→ etc.) via `dish_receiver.send_key`; see
-[keys.py](custom_components/dish_receiver/keys.py).
+Key names are **case-insensitive**, and both the canonical name and the enum name
+work (`live_tv` or `LIVE_TV`, `channel_up` or `ch_up`). Confirmed working on the
+Wally: `home guide info menu up down left right select enter exit back options
+search input format play pause stop record rewind jump recall dvr live_tv red
+green yellow blue applications help microphone keypad backspace delete mute mode
+space`, plus digits `0`–`9` and `dash`. Two names to watch: DISH's own "Cancel"
+and "TV" buttons are `exit` and `live_tv` here — the raw wire tokens aren't
+accepted. The full list is [keys.py](custom_components/dish_receiver/keys.py);
+`dish_receiver.send_key` takes the same vocabulary for a single key.
 
 ### Wally limitations (by design, not a bug)
 
@@ -123,10 +126,23 @@ Prefer a grid-style remote instead of a photo?
 is a ready-to-paste config for the separate [Universal Remote Card](https://github.com/Nerwyn/universal-remote-card)
 (install that card via HACS first) covering every confirmed-working key.
 
+## Universal remotes (SofaBaton X2)
+
+A **SofaBaton X2** can drive the receiver through this integration. Its app has a
+Home Assistant device type that publishes each button press to MQTT; a shipped
+blueprint maps those presses onto keys, direct tunes, app launches and favorite
+stepping, and `tools/sofabaton_map.py` builds the map for you by asking you to
+press each button. Full walkthrough: **[docs/SOFABATON_X2.md](docs/SOFABATON_X2.md)**.
+
+Worth knowing before you try IR instead: the DISH remote reaches the receiver over
+**RF4CE** (ZigBee's radio, proprietary profile), and per DISH's own manual the
+remote's IR is only for the TV and aux devices — the Wally has no IR mode for SAT.
+So no universal remote can control it by IR, and this MQTT path is the way in.
+
 ## Services
 
 - `dish_receiver.tune_channel` — `{ channel: "140" }`
-- `dish_receiver.send_key` — `{ key: "guide" }` (friendly name or raw token)
+- `dish_receiver.send_key` — `{ key: "guide" }` (canonical or enum name, case-insensitive)
 - `dish_receiver.launch_app` — `{ app: "Netflix" }` (Netflix, YouTube)
 
 ## Try it without Home Assistant
