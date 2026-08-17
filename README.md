@@ -4,10 +4,14 @@ Control a DISH **Wally**, **Hopper**, or **Joey** receiver from Home Assistant
 over your LAN — a `media_player` entity plus a full `remote` entity — installable
 via HACS. No IR blaster, no cloud, no hub.
 
-**Multiple boxes?** Wally, Hopper, and every Joey each run the same control
-service on their own IP, so each is added as its own device — pair them one at a
-time. They all auto-discover (see below); the discovery card shows the room name
-plus model (e.g. *Bedroom 1 (HEVC Joey)*) so several Joeys stay distinct.
+**Multiple boxes?** A standalone **Wally** pairs on its own. A **Hopper** with
+**Joeys** works as a group: a Joey routes all control through its Hopper (over the
+internal MoCA network, which the LAN can't reach directly), so you **add the
+Hopper first and pair it**, then each Joey is added instantly — it reuses the
+Hopper's pairing (no separate PIN) and targets that Joey by its serial. Every box
+auto-discovers (see below); the discovery card shows room + model
+(*Living Room (ZiP Hopper)*, *Bedroom 1 (HEVC Joey)*) so they stay distinct — a
+Wally and Hopper in the same room are told apart by model.
 
 > **Status: working and hardware-verified.** The local control protocol was
 > reverse-engineered from the RTI driver source and confirmed live against a
@@ -42,7 +46,10 @@ transports exist as stubs/fallbacks and are not needed for a Wally.
 3. Each receiver on the network appears as its own **"DISH Receiver found"** card
    under Settings → Devices & Services (a Hopper + 4 Joeys shows 5 cards). Or add
    any of them manually via **Add Integration** → **DISH Receiver** by IP.
-4. Submit — a **PIN appears on that box's TV**. Enter it. Done. Repeat per box.
+4. **Add the Hopper (or Wally) first.** Submit its card → a **PIN appears on that
+   box's TV** → enter it. For a Joey, submit its card *after* its Hopper is set
+   up; it links to the Hopper automatically with no PIN. (A Joey added before its
+   Hopper shows a message telling you to add the Hopper first.)
 
 *Discovery not showing up?* Confirm you did a full HA restart (step 2), that the
 box is on the same subnet as HA (SSDP is link-local — it won't cross VLANs

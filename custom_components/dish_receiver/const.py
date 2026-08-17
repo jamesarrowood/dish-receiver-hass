@@ -27,6 +27,16 @@ CONF_SERIAL = "serial"
 CONF_CONTROLLER_MAC = "controller_mac"
 # Digest credentials minted by the receiver during pairing (response name/passwd).
 
+# Host that actually receives control commands. For a standalone Wally or a
+# Hopper this equals CONF_HOST. For a Joey it is the *Hopper's* IP: Joeys
+# redirect their own control endpoint to the Hopper over the internal MoCA
+# network (unreachable from the LAN), so commands go to the Hopper with the
+# Joey's serial as the `stb` target. CONF_HOST stays the Joey's own IP, used
+# for reading its UPnP standby state.
+CONF_CONTROL_HOST = "control_host"
+# The receiver serial of the Hopper a Joey is linked to (its master).
+CONF_LINKED_RECEIVER = "linked_receiver"
+
 # Options keys
 CONF_FAVORITES = "favorites"
 CONF_SCAN_INTERVAL = "scan_interval"

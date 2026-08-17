@@ -42,6 +42,10 @@
       "ssdp_confirm": {
         "title": "DISH Receiver found",
         "description": "Home Assistant found {name} at {host} on the network. Submit to start pairing."
+      },
+      "link_hopper": {
+        "title": "Joey found",
+        "description": "{name} is a Joey controlled through your Hopper ({hopper}). It'll reuse that Hopper's pairing — no separate PIN needed. Submit to add it."
       }
     },
     "error": {
@@ -51,7 +55,8 @@
     },
     "abort": {
       "already_configured": "This receiver is already set up.",
-      "cannot_connect": "Could not determine the discovered receiver's address."
+      "cannot_connect": "Could not determine the discovered receiver's address.",
+      "hopper_not_configured": "This is a Joey, which is controlled through its Hopper. Add the Hopper first (pair it), then add this Joey."
     }
   },
   "options": {

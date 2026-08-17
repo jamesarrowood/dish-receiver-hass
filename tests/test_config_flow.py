@@ -11,12 +11,19 @@ from homeassistant import config_entries  # noqa: E402
 from homeassistant.data_entry_flow import FlowResultType  # noqa: E402
 
 from custom_components.dish_receiver.const import (  # noqa: E402
+    CONF_CONTROL_HOST,
     CONF_DELEGATE_ENTITY,
     CONF_HOST,
+    CONF_PASSWORD,
+    CONF_SERIAL,
     CONF_TRANSPORT,
+    CONF_USERNAME,
     DOMAIN,
     TRANSPORT_DELEGATE,
     TRANSPORT_LOCAL_HTTP,
+)
+from custom_components.dish_receiver.discovery import (  # noqa: E402
+    DiscoveredReceiver,
 )
 
 
@@ -25,8 +32,16 @@ def _no_discovery(monkeypatch):
     async def _empty(timeout=4.0):
         return []
 
+    async def _no_link(session, location):
+        # By default a discovered box has no Hopper link (standalone Wally);
+        # the Joey tests override this.
+        return None
+
     monkeypatch.setattr(
         "custom_components.dish_receiver.config_flow.async_discover", _empty
+    )
+    monkeypatch.setattr(
+        "custom_components.dish_receiver.config_flow.async_fetch_by_location", _no_link
     )
 
 
@@ -163,6 +178,92 @@ async def test_ssdp_discovery_finds_and_pairs(hass, monkeypatch):
     # Name carries the model so multiple Joeys are distinguishable.
     assert result["data"]["name"] == "Bedroom 1 (HEVC Joey)"
     assert result["result"].unique_id == "R0000000000-00"
+
+
+async def test_ssdp_joey_links_to_configured_hopper(hass, monkeypatch):
+    """A discovered Joey attaches to its configured Hopper, no separate PIN."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    # The Hopper is already set up, with its paired credentials.
+    hopper = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="R-HOPPER-32",
+        title="Living Room (ZiP Hopper)",
+        data={
+            CONF_HOST: "192.168.1.51",
+            CONF_TRANSPORT: TRANSPORT_LOCAL_HTTP,
+            CONF_SERIAL: "R-HOPPER-32",
+            CONF_USERNAME: "hopuser",
+            CONF_PASSWORD: "hoppass",
+        },
+    )
+    hopper.add_to_hass(hass)
+
+    # The Joey's device.xml resolves a linked-receiver = the Hopper's serial.
+    async def fake_fetch(session, location):
+        return DiscoveredReceiver(
+            host="192.168.1.74",
+            serial="R-JOEY-01",
+            model="HEVC Joey",
+            friendly_name="Family Room",
+            linked_receiver="R-HOPPER-32",
+        )
+
+    monkeypatch.setattr(
+        "custom_components.dish_receiver.config_flow.async_fetch_by_location",
+        fake_fetch,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_SSDP},
+        data=_ssdp_info(
+            serialNumber="R-JOEY-01",
+            modelName="HEVC Joey",
+            friendlyName="Family Room",
+            _location="http://192.168.1.74:49310/device.xml",
+        ),
+    )
+    assert result["step_id"] == "link_hopper"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    data = result["data"]
+    # Commands route to the Hopper; the Joey's own serial is the target stb.
+    assert data[CONF_CONTROL_HOST] == "192.168.1.51"
+    assert data[CONF_HOST] == "192.168.1.74"
+    assert data[CONF_SERIAL] == "R-JOEY-01"
+    # Hopper credentials are reused — no pairing happened.
+    assert data[CONF_USERNAME] == "hopuser"
+    assert data[CONF_PASSWORD] == "hoppass"
+
+
+async def test_ssdp_joey_without_hopper_aborts_with_guidance(hass, monkeypatch):
+    """A Joey discovered before its Hopper aborts asking to add the Hopper."""
+
+    async def fake_fetch(session, location):
+        return DiscoveredReceiver(
+            host="192.168.1.74",
+            serial="R-JOEY-01",
+            model="HEVC Joey",
+            linked_receiver="R-HOPPER-32",  # no such entry configured
+        )
+
+    monkeypatch.setattr(
+        "custom_components.dish_receiver.config_flow.async_fetch_by_location",
+        fake_fetch,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_SSDP},
+        data=_ssdp_info(
+            serialNumber="R-JOEY-01",
+            _location="http://192.168.1.74:49310/device.xml",
+        ),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "hopper_not_configured"
 
 
 async def test_ssdp_discovery_dedupes_already_configured(hass, monkeypatch):

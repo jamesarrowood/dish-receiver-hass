@@ -41,6 +41,7 @@ from ..const import (
     APP_LABEL,
     APP_NAME,
     APP_TYPE,
+    CONF_CONTROL_HOST,
     CONF_CONTROLLER_MAC,
     CONF_HOST,
     CONF_PASSWORD,
@@ -167,6 +168,9 @@ class LocalHttpTransport(DishTransport):
     def __init__(self, hass: HomeAssistant, config: dict[str, Any]) -> None:
         self._hass = hass
         self._host = config.get(CONF_HOST, "")
+        # Commands go to the control host (the Hopper's IP for a Joey); state is
+        # read from _host (the device's own IP). They're equal for Wally/Hopper.
+        self._control_host = config.get(CONF_CONTROL_HOST) or self._host
         self._port = LOCAL_HTTP_PORT
         self._serial = config.get(CONF_SERIAL) or ""
         self._mac = (config.get(CONF_CONTROLLER_MAC) or "").lower().replace(":", "")
@@ -186,7 +190,8 @@ class LocalHttpTransport(DishTransport):
 
     @property
     def _base(self) -> str:
-        return f"http://{self._host}:{self._port}"
+        """Base URL for control commands (pairing + remote_key)."""
+        return f"http://{self._control_host}:{self._port}"
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -332,7 +337,16 @@ class LocalHttpTransport(DishTransport):
                 data=body.encode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 timeout=_timeout(),
+                allow_redirects=False,
             ) as resp:
+                # A Joey redirects control to its Hopper over the internal MoCA
+                # network (169.254.x.x), which the LAN can't reach — never chase
+                # it; surface a clear error instead of a connect timeout.
+                if resp.status in (301, 302, 303, 307, 308):
+                    raise TransportError(
+                        "receiver redirected control to its Hopper — this looks "
+                        "like a Joey; add its Hopper first, then the Joey"
+                    )
                 return resp.status, await resp.text()
         except aiohttp.ClientError as err:
             raise TransportError(f"POST {path} failed: {err}") from err
@@ -354,8 +368,14 @@ class LocalHttpTransport(DishTransport):
             # 1) Unauthenticated POST to obtain the per-request nonce.
             try:
                 async with self._session.post(
-                    url, data=payload, headers=base_headers, timeout=_timeout()
+                    url, data=payload, headers=base_headers, timeout=_timeout(),
+                    allow_redirects=False,
                 ) as first:
+                    if first.status in (301, 302, 303, 307, 308):
+                        raise TransportError(
+                            f"{describe}: receiver redirected control to its "
+                            "Hopper (Joey must be controlled via its Hopper)"
+                        )
                     if first.status not in (401, 200):
                         raise TransportError(
                             f"{describe}: unexpected HTTP {first.status}"
@@ -386,7 +406,8 @@ class LocalHttpTransport(DishTransport):
             headers = {**base_headers, "Authorization": auth}
             try:
                 async with self._session.post(
-                    url, data=payload, headers=headers, timeout=_timeout()
+                    url, data=payload, headers=headers, timeout=_timeout(),
+                    allow_redirects=False,
                 ) as second:
                     if second.status == 401:
                         raise PairingRequired(

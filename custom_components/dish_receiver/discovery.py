@@ -17,6 +17,7 @@ import re
 import socket
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
 import aiohttp
 
@@ -47,6 +48,7 @@ class DiscoveredReceiver:
     control_url: Optional[str] = None  # EchoStar UPnP control endpoint
     event_url: Optional[str] = None  # EchoStar UPnP GENA event-subscription URL
     dial_url: Optional[str] = None  # DIAL Application-URL for app launch
+    linked_receiver: Optional[str] = None  # a Joey's master Hopper serial, if any
 
 
 async def _msearch(timeout: float) -> dict[str, str]:
@@ -130,15 +132,10 @@ async def _fetch_description(
     return receiver
 
 
-async def async_echostar_devinfo(
-    session: aiohttp.ClientSession, control_url: str
+async def async_echostar_action(
+    session: aiohttp.ClientSession, control_url: str, action: str
 ) -> dict[str, str]:
-    """Call the EchoStar UPnP GetEchostarDevInfo action → {field: value}.
-
-    Unauthenticated. Returns keys like Standby_Status ("LIVE"/standby), Status,
-    Version, Name, Type. Empty dict on failure.
-    """
-    action = "GetEchostarDevInfo"
+    """Invoke an EchoStar UPnP action → {out-arg: value}. Empty dict on failure."""
     body = (
         '<?xml version="1.0"?>'
         '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" '
@@ -157,13 +154,44 @@ async def async_echostar_devinfo(
         ) as resp:
             xml = await resp.text()
     except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-        _LOGGER.debug("GetEchostarDevInfo failed: %s", err)
+        _LOGGER.debug("%s failed: %s", action, err)
         return {}
     out: dict[str, str] = {}
     for key, value in re.findall(r"<(\w+)>([^<]*)</\1>", xml):
         if value.strip() and key not in ("s:Body",):
             out[key] = value.strip()
     return out
+
+
+async def async_echostar_devinfo(
+    session: aiohttp.ClientSession, control_url: str
+) -> dict[str, str]:
+    """GetEchostarDevInfo → Standby_Status/Status/Version/Name/Type/etc."""
+    return await async_echostar_action(session, control_url, "GetEchostarDevInfo")
+
+
+async def async_fetch_by_location(
+    session: aiohttp.ClientSession, location: str
+) -> DiscoveredReceiver:
+    """Build a DiscoveredReceiver directly from a device.xml URL (unicast, no
+    SSDP), and resolve its master Hopper serial if it is a linked Joey.
+
+    Used by the config flow, which already knows the box's device.xml URL from
+    the SSDP announcement — no need to re-run a multicast search.
+    """
+    host = urlparse(location).hostname or ""
+    rec = await _fetch_description(session, host, location)
+    if rec.control_url:
+        linked = await async_echostar_action(
+            session, rec.control_url, "GetEchostarLinkedReceiverID"
+        )
+        val = linked.get("Linked_Receiver_ID") or linked.get(
+            "Connected_To_Receiver_ID"
+        )
+        # A standalone box reports itself (or nothing); only a real master link counts.
+        if val and val != rec.serial:
+            rec.linked_receiver = val
+    return rec
 
 
 async def async_discover(

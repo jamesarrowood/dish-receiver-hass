@@ -22,6 +22,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -30,10 +31,12 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_CONTROL_HOST,
     CONF_CONTROLLER_MAC,
     CONF_DELEGATE_ENTITY,
     CONF_FAVORITES,
     CONF_HOST,
+    CONF_LINKED_RECEIVER,
     CONF_MAC,
     CONF_MODEL,
     CONF_NAME,
@@ -172,6 +175,9 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
         upnp = discovery_info.upnp
         serial = upnp.get("serialNumber")
         model = upnp.get("modelName") or upnp.get("modelDescription")
+        # modelDescription ("Wally"/"ZiP Hopper"/"HEVC Joey") distinguishes a
+        # Wally from a Hopper, which share modelName XiP813 and often a room name.
+        model_label = upnp.get("modelDescription") or upnp.get("modelName")
         name = upnp.get("friendlyName")
         udn = upnp.get("UDN")
 
@@ -192,12 +198,71 @@ class DishConfigFlow(ConfigFlow, domain=DOMAIN):
         # Room name plus model, so multiple Joeys ("Bedroom 1", "Bedroom 2",
         # each an HEVC Joey) stay distinct in the device list.
         display = name or "DISH Receiver"
-        if model and model not in display:
-            display = f"{display} ({model})"
+        if model_label and model_label not in display:
+            display = f"{display} ({model_label})"
         self._data[CONF_NAME] = display
-
         self.context["title_placeholders"] = {"name": display}
+
+        # A Joey redirects its own control endpoint to its Hopper over the
+        # internal MoCA network, so it can't be paired directly — resolve its
+        # master Hopper and reuse that Hopper's connection instead.
+        from .discovery import async_fetch_by_location
+
+        session = async_get_clientsession(self.hass)
+        try:
+            rec = await async_fetch_by_location(
+                session, discovery_info.ssdp_location or ""
+            )
+        except Exception:  # noqa: BLE001 - discovery must not crash the flow
+            rec = None
+        if rec is not None and rec.linked_receiver:
+            self._data[CONF_LINKED_RECEIVER] = rec.linked_receiver
+            return await self.async_step_link_hopper()
+
         return await self.async_step_ssdp_confirm()
+
+    async def async_step_link_hopper(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """A discovered Joey: attach it to its already-configured Hopper.
+
+        Control commands go to the Hopper (CONF_CONTROL_HOST) with the Joey's
+        serial as `stb`; the Hopper's pairing credentials are reused, so the
+        Joey needs no separate PIN. State (standby) is still read from the
+        Joey's own IP.
+        """
+        hopper = self._find_hopper_entry(self._data.get(CONF_LINKED_RECEIVER))
+        if hopper is None:
+            # The Hopper isn't set up yet — the user must add it first.
+            return self.async_abort(reason="hopper_not_configured")
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="link_hopper",
+                description_placeholders={
+                    "name": self._data.get(CONF_NAME, "Joey"),
+                    "hopper": hopper.title,
+                },
+            )
+
+        hopper_data = {**hopper.data, **hopper.options}
+        self._data[CONF_CONTROL_HOST] = hopper_data.get(CONF_HOST)
+        self._data[CONF_USERNAME] = hopper_data.get(CONF_USERNAME, "")
+        self._data[CONF_PASSWORD] = hopper_data.get(CONF_PASSWORD, "")
+        # Share the Hopper's paired controller identity (the box trusts it).
+        if hopper_data.get(CONF_CONTROLLER_MAC):
+            self._data[CONF_CONTROLLER_MAC] = hopper_data[CONF_CONTROLLER_MAC]
+        return await self._create_entry()
+
+    def _find_hopper_entry(self, hopper_serial: str | None):
+        """The configured entry whose receiver serial is `hopper_serial`."""
+        if not hopper_serial:
+            return None
+        for entry in self._async_current_entries():
+            data = {**entry.data, **entry.options}
+            if data.get(CONF_SERIAL) == hopper_serial:
+                return entry
+        return None
 
     async def async_step_ssdp_confirm(
         self, user_input: dict[str, Any] | None = None
