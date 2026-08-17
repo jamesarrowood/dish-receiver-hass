@@ -36,6 +36,17 @@ hard limits rather than "use IR for those" — see [Limits](#limits) below.
 python3 -m pip install paho-mqtt
 ```
 
+- **If you want `fav_next` / `fav_prev` to work**: an `input_number` helper for the
+  automation to keep its place in the favorites list, and some favorites defined
+  in the integration's *Configure* dialog (one per line, `Name=Channel`). Create
+  the helper under Settings → Devices & Services → Helpers → Create helper →
+  Number, with **min 0, max 99, step 1**.
+
+  This is needed because no DISH transport reports the tuned channel — the
+  receiver simply doesn't expose it — so `media_player.source` is always unknown
+  and the automation has nowhere else to remember which favorite you're on.
+  Without the helper, every press lands on the first favorite instead of stepping.
+
 ## 1. Add the Home Assistant device in the SofaBaton app
 
 In the SofaBaton app, add a device, choose the **Wi-Fi / Home Assistant** type, and
@@ -105,6 +116,8 @@ Create an automation from it and fill in:
 - **DISH media player entity** — `media_player.<your receiver>`
 - **Key map** — the block from step 3 (keep the quotes around `"7:1"`; bare
   `7:1` isn't valid YAML)
+- **Favorite cursor helper** — the `input_number` from the requirements above.
+  Leave it empty if you aren't using `fav_next` / `fav_prev`.
 
 Unmapped presses are ignored silently, so a partial map is perfectly fine while
 you're still building it up.
@@ -152,6 +165,11 @@ to the Home Assistant device:
   readable only. `wake` is the honest version of a power button.
 - **No channel/page step, no fast-forward, no volume** over IP. `fav_next` /
   `fav_prev` cover channel stepping; volume belongs to the TV.
+- **The receiver never reports its current channel.** `media_player.source` and
+  the `channel_number` attribute stay empty on a Wally, which is why favorite
+  stepping needs its own cursor helper. It also means the cursor can drift out of
+  sync if you tune by any other route — press the favorite button twice to
+  resynchronise.
 - **Ids can shift.** If you delete and recreate commands in the app, the
   `device_id`/`key_id` pairs may change. Re-run the capture if buttons start
   doing the wrong thing.

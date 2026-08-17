@@ -17,7 +17,9 @@ blueprint:
       * `tune:140` / `tune:140-01` — direct tune
       * `app:Netflix` / `app:YouTube` — DIAL app launch
       * `fav_next` / `fav_prev` — step through your favorites (the Wally has no
-        channel up/down over IP, so this is the stand-in)
+        channel up/down over IP, so this is the stand-in). Needs the cursor
+        helper below to actually step, because the receiver never reports which
+        channel it's on.
       * `wake` — nudge the receiver out of standby, no-op if it's already on
   domain: automation
   source_url: https://github.com/jamesarrowood/dish-receiver-hass/blob/main/blueprints/automation/dish_receiver/sofabaton_x2.yaml
@@ -55,6 +57,20 @@ blueprint:
         "0:0": guide
       selector:
         object:
+    fav_cursor:
+      name: Favorite cursor helper (optional)
+      description: >-
+        An `input_number` that remembers which favorite you're on. Required for
+        `fav_next` / `fav_prev` to actually step: no DISH transport reports the
+        current channel, so the media player's `source` is always unknown and the
+        automation has nowhere else to keep its place. Create one with min 0, max
+        99, step 1. Without it, stepping just jumps to the first (or last)
+        favorite every time.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: input_number
     app_names:
       name: Names to skip when stepping favorites
       description: >-
@@ -81,6 +97,7 @@ variables:
   dish_media_player: !input dish_media_player
   key_map: !input key_map
   app_names: !input app_names
+  fav_cursor: !input fav_cursor
   # Defensive: a non-JSON payload (or one missing either id) must yield a code
   # that simply won't match, never a template error that spams the log.
   code: >-
@@ -126,26 +143,42 @@ action:
               favorites: >-
                 {{ (state_attr(dish_media_player, 'source_list') | default([], true))
                    | reject('in', app_names) | list }}
-              target_source: >-
-                {% set favs = (state_attr(dish_media_player, 'source_list') | default([], true))
-                              | reject('in', app_names) | list %}
-                {% set current = state_attr(dish_media_player, 'source') %}
-                {% if favs | count == 0 %}
-                  {{ '' }}
-                {% elif current not in favs %}
-                  {# Not sitting on a favorite: enter the list from whichever end. #}
-                  {{ favs[0] if command == 'fav_next' else favs[-1] }}
+              # Where we are now. The cursor helper is the real source of truth —
+              # `source` only resolves if a transport reports the tuned channel,
+              # which none currently do. -1 means "position unknown".
+              current_index: >-
+                {% if fav_cursor not in ['', none] and states(fav_cursor) not in ['unknown', 'unavailable', none] %}
+                  {{ states(fav_cursor) | int(-1) }}
                 {% else %}
-                  {% set step = 1 if command == 'fav_next' else -1 %}
-                  {{ favs[(favs.index(current) + step) % (favs | count)] }}
+                  {% set current = state_attr(dish_media_player, 'source') %}
+                  {{ favorites.index(current) if current in favorites else -1 }}
+                {% endif %}
+              target_index: >-
+                {% set n = favorites | count %}
+                {% if n == 0 %}
+                  {{ -1 }}
+                {% elif current_index | int(-1) < 0 or current_index | int(-1) >= n %}
+                  {# Position unknown or stale: enter the list from whichever end. #}
+                  {{ 0 if command == 'fav_next' else n - 1 }}
+                {% else %}
+                  {{ (current_index | int + (1 if command == 'fav_next' else -1)) % n }}
                 {% endif %}
           - condition: template
-            value_template: "{{ target_source != '' }}"
+            value_template: "{{ target_index | int(-1) >= 0 }}"
           - service: media_player.select_source
             target:
               entity_id: !input dish_media_player
             data:
-              source: "{{ target_source }}"
+              source: "{{ favorites[target_index | int] }}"
+          - if:
+              - condition: template
+                value_template: "{{ fav_cursor not in ['', none] }}"
+            then:
+              - service: input_number.set_value
+                target:
+                  entity_id: !input fav_cursor
+                data:
+                  value: "{{ target_index | int }}"
 
       # Wake from standby — any key wakes a Wally, so send a harmless one
       - conditions:

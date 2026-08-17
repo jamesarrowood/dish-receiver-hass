@@ -140,6 +140,7 @@ def test_blueprint_inputs_match_documented_names():
         "dish_media_player",
         "key_map",
         "app_names",
+        "fav_cursor",
     }
 
 
@@ -166,12 +167,45 @@ def _render(source, **context):
     return jinja2.Environment().from_string(source).render(**context).strip()
 
 
-def _fav_template():
+def _fav_variables():
+    """The favorite-stepping branch's variables block."""
     for branch in _load_blueprint()["action"][0]["choose"]:
         for step in branch["sequence"]:
             if isinstance(step, dict) and "variables" in step:
-                return step["variables"]["target_source"]
+                return step["variables"]
     raise AssertionError("favorite-stepping branch not found")
+
+
+def _step_favorite(command, sources, cursor=None, source=None, apps=("Netflix", "YouTube")):
+    """Render the branch's variables in order, returning the chosen index.
+
+    Mirrors how HA renders a `variables:` block: each entry can see the ones
+    before it.
+    """
+    variables = _fav_variables()
+
+    def state_attr(_entity, attr):
+        return list(sources) if attr == "source_list" else source
+
+    def states(_entity):
+        return "unknown" if cursor is None else str(cursor)
+
+    context = {
+        "dish_media_player": "media_player.x",
+        "fav_cursor": "" if cursor is None else "input_number.fav",
+        "app_names": list(apps),
+        "command": command,
+        "state_attr": state_attr,
+        "states": states,
+    }
+    for name in ("favorites", "current_index", "target_index"):
+        rendered = _render(variables[name], **context)
+        if name == "favorites":
+            # Jinja renders a list to its repr; HA returns native types.
+            context[name] = [s.strip(" '\"") for s in rendered.strip("[]").split(",") if s.strip()]
+        else:
+            context[name] = int(rendered)
+    return context["target_index"]
 
 
 @pytest.mark.parametrize(
@@ -200,53 +234,41 @@ def test_command_lookup(key_map, code, expected):
     assert _render(template, key_map=key_map, code=code) == expected
 
 
+SOURCES = ["ESPN", "HBO", "TNT", "Netflix", "YouTube"]  # 3 favorites + 2 apps
+
+
 @pytest.mark.parametrize(
-    "command,current,expected",
+    "command,cursor,expected",
     [
-        ("fav_next", "ESPN", "HBO"),
-        ("fav_next", "TNT", "ESPN"),  # wraps forward past the apps
-        ("fav_prev", "ESPN", "TNT"),  # wraps backward
-        ("fav_prev", "HBO", "ESPN"),
-        ("fav_next", None, "ESPN"),  # not on a favorite: enter at the front
-        ("fav_prev", None, "TNT"),  # ...or the back
-        ("fav_next", "Netflix", "ESPN"),  # an app is not a favorite
+        ("fav_next", 0, 1),
+        ("fav_next", 1, 2),
+        ("fav_next", 2, 0),  # wraps forward past the apps
+        ("fav_prev", 2, 1),
+        ("fav_prev", 0, 2),  # wraps backward
+        ("fav_next", None, 0),  # no cursor yet: enter at the front
+        ("fav_prev", None, 2),  # ...or the back
+        ("fav_next", 7, 0),  # stale cursor beyond the list: reset, don't crash
     ],
 )
-def test_favorite_stepping(command, current, expected):
-    sources = ["ESPN", "HBO", "TNT", "Netflix", "YouTube"]
-
-    def state_attr(_entity, attr):
-        return sources if attr == "source_list" else current
-
-    assert (
-        _render(
-            _fav_template(),
-            command=command,
-            app_names=["Netflix", "YouTube"],
-            dish_media_player="media_player.x",
-            state_attr=state_attr,
-        )
-        == expected
-    )
+def test_favorite_stepping_uses_the_cursor(command, cursor, expected):
+    """The cursor is the only workable position source — no transport reports
+    the tuned channel, so media_player.source is always None on real hardware."""
+    assert _step_favorite(command, SOURCES, cursor=cursor) == expected
 
 
-@pytest.mark.parametrize("sources", [[], None, ["Netflix", "YouTube"]])
+@pytest.mark.parametrize(
+    "command,source,expected",
+    [("fav_next", "ESPN", 1), ("fav_prev", "TNT", 1), ("fav_next", "Netflix", 0)],
+)
+def test_favorite_stepping_falls_back_to_source(command, source, expected):
+    """Without a cursor helper, fall back to `source` if a transport ever sets it."""
+    assert _step_favorite(command, SOURCES, cursor=None, source=source) == expected
+
+
+@pytest.mark.parametrize("sources", [[], ["Netflix", "YouTube"]])
 def test_favorite_stepping_without_favorites_is_a_noop(sources):
-    """No favorites configured must yield '' so the next condition stops the run."""
-
-    def state_attr(_entity, attr):
-        return sources if attr == "source_list" else None
-
-    assert (
-        _render(
-            _fav_template(),
-            command="fav_next",
-            app_names=["Netflix", "YouTube"],
-            dish_media_player="media_player.x",
-            state_attr=state_attr,
-        )
-        == ""
-    )
+    """No favorites configured must yield -1 so the next condition stops the run."""
+    assert _step_favorite("fav_next", sources, cursor=0) == -1
 
 
 def test_docs_key_table_is_dispatchable():
