@@ -272,11 +272,18 @@ def test_favorite_stepping_without_favorites_is_a_noop(sources):
 
 
 def test_docs_key_table_is_dispatchable():
-    """Every action shown in the docs must survive parse_action."""
+    """Every action in the docs' button-layout table must survive parse_action.
+
+    Scoped to that one section — the doc has other tables (the IR/IP comparison,
+    for one) whose second column isn't an action.
+    """
     doc = (ROOT / "docs" / "SOFABATON_X2.md").read_text()
+    section = doc.split("## 5. Suggested button layout", 1)
+    assert len(section) == 2, "button-layout section heading changed"
+    body = section[1].split("\n## ", 1)[0]
     actions = [
         line.split("|")[2].strip().strip("`")
-        for line in doc.splitlines()
+        for line in body.splitlines()
         if line.startswith("| ") and line.count("|") >= 3
     ]
     checked = 0
