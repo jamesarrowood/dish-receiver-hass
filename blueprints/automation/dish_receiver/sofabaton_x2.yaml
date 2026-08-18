@@ -1,0 +1,205 @@
+blueprint:
+  name: SofaBaton X2 → DISH receiver
+  description: >-
+    Bridge a SofaBaton X2 universal remote to a DISH receiver over MQTT.
+
+    The X2's "Home Assistant" device type publishes `{"device_id":N,"key_id":M}`
+    to a single topic every time one of its buttons is pressed. The ids are
+    assigned by the SofaBaton app and can't be renamed, so this blueprint takes a
+    **key map** of `"<device_id>:<key_id>" → action` and dispatches each press to
+    the right `dish_receiver` call.
+
+    Build the map by pressing buttons with `tools/sofabaton_map.py` — it prints a
+    ready-to-paste block. Full walkthrough: docs/SOFABATON_X2.md
+
+    Action values:
+      * a key name — `guide`, `up`, `select`, `live_tv`, `exit`, `5`, … (see keys.py)
+      * `tune:140` / `tune:140-01` — direct tune
+      * `app:Netflix` / `app:YouTube` — DIAL app launch
+      * `fav_next` / `fav_prev` — step through your favorites (the Wally has no
+        channel up/down over IP, so this is the stand-in). Needs the cursor
+        helper below to actually step, because the receiver never reports which
+        channel it's on.
+      * `wake` — nudge the receiver out of standby, no-op if it's already on
+  domain: automation
+  source_url: https://github.com/jamesarrowood/dish-receiver-hass/blob/main/blueprints/automation/dish_receiver/sofabaton_x2.yaml
+  input:
+    mqtt_topic:
+      name: MQTT topic
+      description: >-
+        The topic the SofaBaton hub publishes to — the remote's MAC address
+        followed by `/up`, e.g. `aabbccddeeff/up`. Confirm yours with
+        `python3 tools/sofabaton_map.py --listen`.
+      selector:
+        text:
+    dish_remote:
+      name: DISH remote entity
+      description: Receives plain key presses.
+      selector:
+        entity:
+          filter:
+            - domain: remote
+              integration: dish_receiver
+    dish_media_player:
+      name: DISH media player entity
+      description: Receives tuning, app launches and favorite stepping.
+      selector:
+        entity:
+          filter:
+            - domain: media_player
+              integration: dish_receiver
+    key_map:
+      name: Key map
+      description: >-
+        `"<device_id>:<key_id>": <action>` for every button you mapped. Quote the
+        keys — bare `7:1` is not valid YAML. Unmapped presses are ignored.
+      default:
+        "0:0": guide
+      selector:
+        object:
+    fav_cursor:
+      name: Favorite cursor helper (optional)
+      description: >-
+        An `input_number` that remembers which favorite you're on. Required for
+        `fav_next` / `fav_prev` to actually step: no DISH transport reports the
+        current channel, so the media player's `source` is always unknown and the
+        automation has nowhere else to keep its place. Create one with min 0, max
+        99, step 1. Without it, stepping just jumps to the first (or last)
+        favorite every time.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: input_number
+    app_names:
+      name: Names to skip when stepping favorites
+      description: >-
+        The media player's source list is favorites *plus* launchable apps. These
+        names are excluded from `fav_next` / `fav_prev` so stepping stays on real
+        channels.
+      default:
+        - Netflix
+        - YouTube
+      selector:
+        text:
+          multiple: true
+
+mode: queued
+max: 25
+max_exceeded: silent
+
+trigger:
+  - platform: mqtt
+    topic: !input mqtt_topic
+
+variables:
+  dish_remote: !input dish_remote
+  dish_media_player: !input dish_media_player
+  key_map: !input key_map
+  app_names: !input app_names
+  fav_cursor: !input fav_cursor
+  # Defensive: a non-JSON payload (or one missing either id) must yield a code
+  # that simply won't match, never a template error that spams the log.
+  code: >-
+    {% set p = trigger.payload_json | default({}, true) %}
+    {{ p.device_id | default('') }}:{{ p.key_id | default('') }}
+  command: >-
+    {{ (key_map | default({}, true)).get(code) | default('', true) | trim }}
+
+condition:
+  - condition: template
+    value_template: "{{ command != '' }}"
+
+action:
+  - choose:
+      # Direct tune — tune:140, tune:140-01
+      - conditions:
+          - condition: template
+            value_template: "{{ command.startswith('tune:') }}"
+        sequence:
+          - service: dish_receiver.tune_channel
+            target:
+              entity_id: !input dish_media_player
+            data:
+              channel: "{{ command.split(':', 1)[1] | trim }}"
+
+      # App launch — app:Netflix
+      - conditions:
+          - condition: template
+            value_template: "{{ command.startswith('app:') }}"
+        sequence:
+          - service: dish_receiver.launch_app
+            target:
+              entity_id: !input dish_media_player
+            data:
+              app: "{{ command.split(':', 1)[1] | trim }}"
+
+      # Favorite stepping — the channel up/down replacement
+      - conditions:
+          - condition: template
+            value_template: "{{ command in ['fav_next', 'fav_prev'] }}"
+        sequence:
+          - variables:
+              favorites: >-
+                {{ (state_attr(dish_media_player, 'source_list') | default([], true))
+                   | reject('in', app_names) | list }}
+              # Where we are now. The cursor helper is the real source of truth —
+              # `source` only resolves if a transport reports the tuned channel,
+              # which none currently do. -1 means "position unknown".
+              current_index: >-
+                {% if fav_cursor not in ['', none] and states(fav_cursor) not in ['unknown', 'unavailable', none] %}
+                  {{ states(fav_cursor) | int(-1) }}
+                {% else %}
+                  {% set current = state_attr(dish_media_player, 'source') %}
+                  {{ favorites.index(current) if current in favorites else -1 }}
+                {% endif %}
+              target_index: >-
+                {% set n = favorites | count %}
+                {% if n == 0 %}
+                  {{ -1 }}
+                {% elif current_index | int(-1) < 0 or current_index | int(-1) >= n %}
+                  {# Position unknown or stale: enter the list from whichever end. #}
+                  {{ 0 if command == 'fav_next' else n - 1 }}
+                {% else %}
+                  {{ (current_index | int + (1 if command == 'fav_next' else -1)) % n }}
+                {% endif %}
+          - condition: template
+            value_template: "{{ target_index | int(-1) >= 0 }}"
+          - service: media_player.select_source
+            target:
+              entity_id: !input dish_media_player
+            data:
+              source: "{{ favorites[target_index | int] }}"
+          - if:
+              - condition: template
+                value_template: "{{ fav_cursor not in ['', none] }}"
+            then:
+              - service: input_number.set_value
+                target:
+                  entity_id: !input fav_cursor
+                data:
+                  value: "{{ target_index | int }}"
+
+      # Wake from standby — any key wakes a Wally, so send a harmless one
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'wake' }}"
+        sequence:
+          - condition: template
+            value_template: "{{ states(dish_media_player) != 'on' }}"
+          - service: remote.send_command
+            target:
+              entity_id: !input dish_remote
+            data:
+              command:
+                - select
+
+    # Anything else is a plain key name. Invalid names are logged and dropped by
+    # the integration rather than raising, so keep the map honest.
+    default:
+      - service: remote.send_command
+        target:
+          entity_id: !input dish_remote
+        data:
+          command:
+            - "{{ command }}"

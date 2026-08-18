@@ -1,0 +1,190 @@
+blueprint:
+  name: SofaBaton Wi-Fi commands → DISH receiver
+  description: >-
+    Bridge a SofaBaton X1/X1S/X2 remote to a DISH receiver using the **Sofabaton X**
+    integration's Wifi Commands.
+
+    Each press of a Wifi Command updates `sensor.<hub>_wifi_commands` with the
+    command's **name**, so unlike the MQTT route there are no opaque ids to
+    capture — name a command `dvr` in the hub and map `dvr` here.
+
+    Pair this with IR rather than replacing it. The Wally accepts IR for power,
+    channel step and fast-forward; spend Wifi Command slots on what IR can't do —
+    direct tuning, app launches, and receivers in other rooms.
+
+    Action values:
+      * a key name — `guide`, `dvr`, `select`, `live_tv`, `5`, … (see keys.py)
+      * `tune:140` / `tune:140-01` — direct tune
+      * `app:Netflix` / `app:YouTube` — DIAL app launch
+      * `fav_next` / `fav_prev` — step favorites (needs the cursor helper)
+      * `wake` — nudge out of standby, no-op if already on
+
+    Map a long press by suffixing the command name with `/longpress`.
+  domain: automation
+  source_url: https://github.com/jamesarrowood/dish-receiver-hass/blob/main/blueprints/automation/dish_receiver/sofabaton_wifi_commands.yaml
+  input:
+    command_sensor:
+      name: Wifi commands sensor
+      description: The Sofabaton hub's `sensor.<hub>_wifi_commands` entity.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              integration: sofabaton_x1s
+    dish_remote:
+      name: DISH remote entity
+      selector:
+        entity:
+          filter:
+            - domain: remote
+              integration: dish_receiver
+    dish_media_player:
+      name: DISH media player entity
+      selector:
+        entity:
+          filter:
+            - domain: media_player
+              integration: dish_receiver
+    command_map:
+      name: Command map
+      description: >-
+        `<command name>: <action>` for each Wifi Command. Add `<name>/longpress`
+        entries for long presses. Unmapped presses are ignored.
+      default:
+        dvr: dvr
+      selector:
+        object:
+    fav_cursor:
+      name: Favorite cursor helper (optional)
+      description: >-
+        An `input_number` remembering which favorite you're on. Required for
+        `fav_next` / `fav_prev`, because no DISH transport reports the tuned
+        channel.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: input_number
+    app_names:
+      name: Names to skip when stepping favorites
+      default:
+        - Netflix
+        - YouTube
+      selector:
+        text:
+          multiple: true
+
+mode: queued
+max: 25
+max_exceeded: silent
+
+trigger:
+  # Trigger on `timestamp`, not the state: pressing the same button twice leaves
+  # the state string unchanged, so a plain state trigger would miss the repeat.
+  - platform: state
+    entity_id: !input command_sensor
+    attribute: timestamp
+
+variables:
+  dish_remote: !input dish_remote
+  dish_media_player: !input dish_media_player
+  command_map: !input command_map
+  app_names: !input app_names
+  fav_cursor: !input fav_cursor
+  pressed: >-
+    {% set a = trigger.to_state.attributes | default({}, true) %}
+    {% set name = a.received_command | default('', true) %}
+    {{ name ~ ('/longpress' if a.press_type | default('') == 'long' else '') }}
+  command: >-
+    {{ (command_map | default({}, true)).get(pressed) | default('', true) | trim }}
+
+condition:
+  # A fresh timestamp with no command name means the sensor was reset, not pressed.
+  - condition: template
+    value_template: >-
+      {{ trigger.to_state.attributes.timestamp not in [none, 'unknown', 'unavailable']
+         and command != '' }}
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ command.startswith('tune:') }}"
+        sequence:
+          - service: dish_receiver.tune_channel
+            target:
+              entity_id: !input dish_media_player
+            data:
+              channel: "{{ command.split(':', 1)[1] | trim }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ command.startswith('app:') }}"
+        sequence:
+          - service: dish_receiver.launch_app
+            target:
+              entity_id: !input dish_media_player
+            data:
+              app: "{{ command.split(':', 1)[1] | trim }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ command in ['fav_next', 'fav_prev'] }}"
+        sequence:
+          - variables:
+              favorites: >-
+                {{ (state_attr(dish_media_player, 'source_list') | default([], true))
+                   | reject('in', app_names) | list }}
+              current_index: >-
+                {% if fav_cursor not in ['', none] and states(fav_cursor) not in ['unknown', 'unavailable', none] %}
+                  {{ states(fav_cursor) | int(-1) }}
+                {% else %}
+                  {% set current = state_attr(dish_media_player, 'source') %}
+                  {{ favorites.index(current) if current in favorites else -1 }}
+                {% endif %}
+              target_index: >-
+                {% set n = favorites | count %}
+                {% if n == 0 %}
+                  {{ -1 }}
+                {% elif current_index | int(-1) < 0 or current_index | int(-1) >= n %}
+                  {{ 0 if command == 'fav_next' else n - 1 }}
+                {% else %}
+                  {{ (current_index | int + (1 if command == 'fav_next' else -1)) % n }}
+                {% endif %}
+          - condition: template
+            value_template: "{{ target_index | int(-1) >= 0 }}"
+          - service: media_player.select_source
+            target:
+              entity_id: !input dish_media_player
+            data:
+              source: "{{ favorites[target_index | int] }}"
+          - if:
+              - condition: template
+                value_template: "{{ fav_cursor not in ['', none] }}"
+            then:
+              - service: input_number.set_value
+                target:
+                  entity_id: !input fav_cursor
+                data:
+                  value: "{{ target_index | int }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ command == 'wake' }}"
+        sequence:
+          - condition: template
+            value_template: "{{ states(dish_media_player) != 'on' }}"
+          - service: remote.send_command
+            target:
+              entity_id: !input dish_remote
+            data:
+              command:
+                - select
+
+    default:
+      - service: remote.send_command
+        target:
+          entity_id: !input dish_remote
+        data:
+          command:
+            - "{{ command }}"
