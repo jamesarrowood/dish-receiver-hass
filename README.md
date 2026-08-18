@@ -134,10 +134,15 @@ blueprint maps those presses onto keys, direct tunes, app launches and favorite
 stepping, and `tools/sofabaton_map.py` builds the map for you by asking you to
 press each button. Full walkthrough: **[docs/SOFABATON_X2.md](docs/SOFABATON_X2.md)**.
 
-Worth knowing before you try IR instead: the DISH remote reaches the receiver over
-**RF4CE** (ZigBee's radio, proprietary profile), and per DISH's own manual the
-remote's IR is only for the TV and aux devices — the Wally has no IR mode for SAT.
-So no universal remote can control it by IR, and this MQTT path is the way in.
+Pair it with IR rather than replacing IR. The **Wally does accept IR** — verified
+by transmitting a DISH power-toggle code and watching `media_player` flip between
+`on` and `off` — so a universal remote can cover power, channel up/down and
+fast-forward, which this integration can't send over IP. Home Assistant then adds
+what IR can't do: one-press direct tuning, app launches, standby state, and
+receivers in rooms the blaster can't see.
+
+(The DISH *remote* does use **RF4CE** rather than IR, so you can't clone it or pair
+it to a Zigbee coordinator. That's a fact about the remote, not the receiver.)
 
 ## Services
 

@@ -6,21 +6,32 @@ on that device publishes a small JSON message. This integration turns those
 messages into real receiver commands, so the X2 ends up controlling your Wally
 over IP — through Home Assistant, on your LAN, with no cloud in the path.
 
-## Why MQTT, and not IR
+## IR and IP are complements, not alternatives
 
-A universal remote would normally just learn the DISH remote's codes. That isn't
-possible here:
+**The Wally does accept IR.** This was verified on real hardware: transmitting the
+SofaBaton library's DISH "Power toggle" code flipped `media_player.wally` between
+`on` and `off` within three seconds, reproducibly, with no IP command involved.
 
-- The DISH remote talks to the receiver over **RF4CE** — ZigBee's 802.15.4 radio
-  with a proprietary application profile. It isn't Zigbee Home Automation, so a
-  Zigbee coordinator can't pair it either.
-- The [Wally manual](https://www.manualslib.com/manual/1169016/Dish-Network-Wally.html?page=15)
-  is explicit that the remote controls the Wally **by RF**, and uses IR only for
-  the TV and up to two aux devices. There is no IR mode for SAT.
+That is worth stating plainly because it is easy to conclude otherwise. The DISH
+remote talks to the receiver over **RF4CE** (ZigBee's 802.15.4 radio, proprietary
+profile — a Zigbee coordinator can't pair it), and the
+[Wally manual](https://www.manualslib.com/manual/1169016/Dish-Network-Wally.html?page=15)
+says the remote controls the Wally **by RF**, using IR only for the TV and aux
+devices. Both statements describe *the bundled remote*. Neither says the receiver
+lacks an IR sensor — and it has one.
 
-So the X2's IR blaster can't reach the Wally at all, and MQTT → Home Assistant →
-this integration is the only route. That also means the IP transport's gaps are
-hard limits rather than "use IR for those" — see [Limits](#limits) below.
+So use each transport for what it's good at:
+
+| Use IR for | Use Home Assistant for |
+| --- | --- |
+| Power on/off | Direct tuning — one press to a channel |
+| Channel up/down, page up/down | Launching Netflix / YouTube |
+| Fast-forward | Reading standby state into automations |
+| Volume (via your TV) | Receivers in other rooms the blaster can't reach |
+
+IR covers exactly the gaps in the IP transport (see [Limits](#limits)), which is
+why a hybrid activity beats either one alone. The rest of this document covers the
+Home Assistant half.
 
 ## What you need
 
@@ -130,7 +141,7 @@ to the Home Assistant device:
 
 | X2 button | Action | Why |
 | --- | --- | --- |
-| Power | `wake` | The Wally has no IP power command; any key wakes it, and this no-ops when it's already on. Put the TV's real power on the TV device (IR). |
+| Power | `wake` | Only if you aren't using IR for power. IR power-toggle works on the Wally and is the better choice; `wake` just nudges it out of standby and no-ops when it's already on. |
 | Channel ▲ | `fav_next` | No channel-step over IP. This walks your configured favorites instead. |
 | Channel ▼ | `fav_prev` | As above, in reverse. |
 | D-pad | `up` | |
@@ -161,10 +172,12 @@ to the Home Assistant device:
 
 - **One-way.** The hub publishes; nothing comes back. The X2's screen can't show
   what channel you're on or whether the receiver is awake.
-- **No power off.** Nothing on any reachable interface sets power — standby is
-  readable only. `wake` is the honest version of a power button.
-- **No channel/page step, no fast-forward, no volume** over IP. `fav_next` /
-  `fav_prev` cover channel stepping; volume belongs to the TV.
+- **No power off over IP.** Nothing on any reachable network interface sets power —
+  standby is readable only, and `wake` is the honest version of a power button.
+  **Use IR for real power control**; it works on the Wally.
+- **No channel/page step, no fast-forward, no volume** over IP. IR does all three;
+  `fav_next` / `fav_prev` are the IP-only fallback for channel stepping, and volume
+  belongs to the TV either way.
 - **The receiver never reports its current channel.** `media_player.source` and
   the `channel_number` attribute stay empty on a Wally, which is why favorite
   stepping needs its own cursor helper. It also means the cursor can drift out of
